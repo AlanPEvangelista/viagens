@@ -1,0 +1,585 @@
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const cors = require('cors');
+const multer = require('multer');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const fs = require('fs');
+
+const app = express();
+const PORT = process.env.PORT || 8282;
+const JWT_SECRET = process.env.JWT_SECRET || 'travel_secret_key_2024';
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Configuração do multer para upload de arquivos
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'receipt-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Apenas imagens são permitidas!'), false);
+        }
+    }
+});
+
+// Conectar ao banco SQLite
+const dbPath = path.join(__dirname, 'database', 'travel.db');
+const dbDir = path.dirname(dbPath);
+
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Erro ao conectar com o banco:', err.message);
+    } else {
+        console.log('Conectado ao banco SQLite.');
+        initializeDatabase();
+    }
+});
+
+// Inicializar estrutura do banco
+function initializeDatabase() {
+    // Tabela de usuários
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'guest',
+        name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Tabela de categorias
+    db.run(`CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Tabela de tipos de pagamento
+    db.run(`CREATE TABLE IF NOT EXISTS payment_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Tabela de viagens
+    db.run(`CREATE TABLE IF NOT EXISTS trips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        main_destination TEXT NOT NULL,
+        main_reason TEXT NOT NULL,
+        other_destinations TEXT,
+        companions TEXT,
+        distance REAL,
+        fuel_consumption REAL,
+        estimated_fuel_cost REAL,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        initial_cash REAL NOT NULL,
+        status TEXT DEFAULT 'planned',
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users (id)
+    )`);
+
+    // Tabela de despesas
+    db.run(`CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trip_id INTEGER NOT NULL,
+        category_id INTEGER NOT NULL,
+        payment_type_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT NOT NULL,
+        date DATE NOT NULL,
+        receipt_path TEXT,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (trip_id) REFERENCES trips (id) ON DELETE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES categories (id),
+        FOREIGN KEY (payment_type_id) REFERENCES payment_types (id),
+        FOREIGN KEY (created_by) REFERENCES users (id)
+    )`);
+
+    // Inserir dados padrão
+    insertDefaultData();
+}
+
+function insertDefaultData() {
+    // Usuários padrão
+    const defaultUsers = [
+        { username: 'admin', password: 'admin123', role: 'admin', name: 'Administrador' },
+        { username: 'guest', password: 'guest123', role: 'guest', name: 'Convidado' }
+    ];
+
+    defaultUsers.forEach(user => {
+        bcrypt.hash(user.password, 10, (err, hash) => {
+            if (err) return;
+            db.run(`INSERT OR IGNORE INTO users (username, password, role, name) VALUES (?, ?, ?, ?)`,
+                [user.username, hash, user.role, user.name]);
+        });
+    });
+
+    // Categorias padrão
+    const defaultCategories = [
+        { name: 'Combustível', icon: 'fas fa-gas-pump' },
+        { name: 'Alimentação', icon: 'fas fa-utensils' },
+        { name: 'Hospedagem', icon: 'fas fa-bed' },
+        { name: 'Transporte', icon: 'fas fa-car' },
+        { name: 'Entretenimento', icon: 'fas fa-ticket-alt' },
+        { name: 'Compras', icon: 'fas fa-shopping-bag' },
+        { name: 'Outros', icon: 'fas fa-ellipsis-h' }
+    ];
+
+    defaultCategories.forEach(category => {
+        db.run(`INSERT OR IGNORE INTO categories (name, icon) VALUES (?, ?)`,
+            [category.name, category.icon]);
+    });
+
+    // Tipos de pagamento padrão
+    const defaultPaymentTypes = [
+        { name: 'Dinheiro', icon: 'fas fa-money-bill-wave' },
+        { name: 'Cartão de Crédito', icon: 'fas fa-credit-card' },
+        { name: 'Cartão de Débito', icon: 'fas fa-credit-card' },
+        { name: 'PIX', icon: 'fas fa-mobile-alt' },
+        { name: 'Transferência', icon: 'fas fa-exchange-alt' }
+    ];
+
+    defaultPaymentTypes.forEach(type => {
+        db.run(`INSERT OR IGNORE INTO payment_types (name, icon) VALUES (?, ?)`,
+            [type.name, type.icon]);
+    });
+}
+
+// Middleware de autenticação
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.sendStatus(401);
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+}
+
+// Middleware para verificar se é admin
+function requireAdmin(req, res, next) {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
+    }
+    next();
+}
+
+// Rotas de autenticação
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+
+    db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
+        if (err) {
+            return res.status(500).json({ error: 'Erro no servidor' });
+        }
+
+        if (!user) {
+            return res.status(401).json({ error: 'Usuário não encontrado' });
+        }
+
+        bcrypt.compare(password, user.password, (err, result) => {
+            if (err || !result) {
+                return res.status(401).json({ error: 'Senha incorreta' });
+            }
+
+            const token = jwt.sign(
+                { id: user.id, username: user.username, role: user.role },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+
+            res.json({
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    name: user.name
+                }
+            });
+        });
+    });
+});
+
+app.post('/api/guest-login', (req, res) => {
+    const token = jwt.sign(
+        { id: 0, username: 'guest', role: 'guest' },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+    );
+
+    res.json({
+        token,
+        user: {
+            id: 0,
+            username: 'guest',
+            role: 'guest',
+            name: 'Convidado'
+        }
+    });
+});
+
+// Rotas de viagens
+app.get('/api/trips', authenticateToken, (req, res) => {
+    db.all(`SELECT * FROM trips ORDER BY created_at DESC`, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+app.post('/api/trips', authenticateToken, requireAdmin, (req, res) => {
+    const {
+        main_destination, main_reason, other_destinations, companions,
+        distance, fuel_consumption, start_date, end_date, initial_cash
+    } = req.body;
+
+    let estimated_fuel_cost = null;
+    if (distance && fuel_consumption) {
+        const fuelNeeded = distance / fuel_consumption;
+        const fuelPrice = 5.50; // Preço médio da gasolina
+        estimated_fuel_cost = fuelNeeded * fuelPrice;
+    }
+
+    db.run(`INSERT INTO trips (
+        main_destination, main_reason, other_destinations, companions,
+        distance, fuel_consumption, estimated_fuel_cost, start_date, end_date,
+        initial_cash, created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [main_destination, main_reason, other_destinations, companions,
+         distance, fuel_consumption, estimated_fuel_cost, start_date, end_date,
+         initial_cash, req.user.id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ id: this.lastID, message: 'Viagem criada com sucesso' });
+        }
+    );
+});
+
+app.put('/api/trips/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const {
+        main_destination, main_reason, other_destinations, companions,
+        distance, fuel_consumption, start_date, end_date, initial_cash, status
+    } = req.body;
+
+    let estimated_fuel_cost = null;
+    if (distance && fuel_consumption) {
+        const fuelNeeded = distance / fuel_consumption;
+        const fuelPrice = 5.50;
+        estimated_fuel_cost = fuelNeeded * fuelPrice;
+    }
+
+    db.run(`UPDATE trips SET
+        main_destination = ?, main_reason = ?, other_destinations = ?, companions = ?,
+        distance = ?, fuel_consumption = ?, estimated_fuel_cost = ?, start_date = ?,
+        end_date = ?, initial_cash = ?, status = ?
+        WHERE id = ?`,
+        [main_destination, main_reason, other_destinations, companions,
+         distance, fuel_consumption, estimated_fuel_cost, start_date, end_date,
+         initial_cash, status || 'planned', id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Viagem atualizada com sucesso' });
+        }
+    );
+});
+
+app.delete('/api/trips/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+
+    db.run(`DELETE FROM trips WHERE id = ?`, [id], function(err) {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json({ message: 'Viagem excluída com sucesso' });
+    });
+});
+
+// Rotas de despesas
+app.get('/api/expenses', authenticateToken, (req, res) => {
+    const query = `
+        SELECT e.*, c.name as category_name, pt.name as payment_type_name,
+               t.main_destination as trip_destination
+        FROM expenses e
+        JOIN categories c ON e.category_id = c.id
+        JOIN payment_types pt ON e.payment_type_id = pt.id
+        JOIN trips t ON e.trip_id = t.id
+        ORDER BY e.created_at DESC
+    `;
+
+    db.all(query, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+app.post('/api/expenses', authenticateToken, upload.single('receipt'), (req, res) => {
+    const {
+        trip_id, category_id, payment_type_id, amount, description, date
+    } = req.body;
+
+    const receipt_path = req.file ? req.file.filename : null;
+
+    db.run(`INSERT INTO expenses (
+        trip_id, category_id, payment_type_id, amount, description, date, receipt_path, created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [trip_id, category_id, payment_type_id, amount, description, date, receipt_path, req.user.id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ id: this.lastID, message: 'Despesa criada com sucesso' });
+        }
+    );
+});
+
+app.put('/api/expenses/:id', authenticateToken, requireAdmin, upload.single('receipt'), (req, res) => {
+    const { id } = req.params;
+    const {
+        trip_id, category_id, payment_type_id, amount, description, date
+    } = req.body;
+
+    let query = `UPDATE expenses SET
+        trip_id = ?, category_id = ?, payment_type_id = ?, amount = ?, description = ?, date = ?`;
+    let params = [trip_id, category_id, payment_type_id, amount, description, date];
+
+    if (req.file) {
+        query += `, receipt_path = ?`;
+        params.push(req.file.filename);
+    }
+
+    query += ` WHERE id = ?`;
+    params.push(id);
+
+    db.run(query, params, function(err) {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json({ message: 'Despesa atualizada com sucesso' });
+    });
+});
+
+app.delete('/api/expenses/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+
+    db.run(`DELETE FROM expenses WHERE id = ?`, [id], function(err) {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json({ message: 'Despesa excluída com sucesso' });
+    });
+});
+
+// Rotas de categorias
+app.get('/api/categories', authenticateToken, (req, res) => {
+    db.all(`SELECT * FROM categories ORDER BY name`, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+app.post('/api/categories', authenticateToken, requireAdmin, (req, res) => {
+    const { name, icon } = req.body;
+
+    db.run(`INSERT INTO categories (name, icon) VALUES (?, ?)`,
+        [name, icon],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ id: this.lastID, message: 'Categoria criada com sucesso' });
+        }
+    );
+});
+
+// Rotas de tipos de pagamento
+app.get('/api/payment-types', authenticateToken, (req, res) => {
+    db.all(`SELECT * FROM payment_types ORDER BY name`, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json(rows);
+    });
+});
+
+app.post('/api/payment-types', authenticateToken, requireAdmin, (req, res) => {
+    const { name, icon } = req.body;
+
+    db.run(`INSERT INTO payment_types (name, icon) VALUES (?, ?)`,
+        [name, icon],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ id: this.lastID, message: 'Tipo de pagamento criado com sucesso' });
+        }
+    );
+});
+
+// Rota para servir imagens de recibos
+app.get('/api/receipts/:filename', authenticateToken, (req, res) => {
+    const filename = req.params.filename;
+    const filepath = path.join(__dirname, 'uploads', filename);
+    
+    if (fs.existsSync(filepath)) {
+        res.sendFile(filepath);
+    } else {
+        res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+});
+
+// Rota para relatórios
+app.get('/api/reports/summary', authenticateToken, (req, res) => {
+    const queries = {
+        totalTrips: `SELECT COUNT(*) as count FROM trips`,
+        activeTrips: `SELECT COUNT(*) as count FROM trips WHERE status = 'active'`,
+        completedTrips: `SELECT COUNT(*) as count FROM trips WHERE status = 'completed'`,
+        totalExpenses: `SELECT COALESCE(SUM(amount), 0) as total FROM expenses`
+    };
+
+    const results = {};
+    let completed = 0;
+    const total = Object.keys(queries).length;
+
+    Object.entries(queries).forEach(([key, query]) => {
+        db.get(query, (err, row) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            
+            results[key] = key === 'totalExpenses' ? row.total : row.count;
+            completed++;
+            
+            if (completed === total) {
+                results.averageExpensePerTrip = results.totalTrips > 0 ? 
+                    results.totalExpenses / results.totalTrips : 0;
+                res.json(results);
+            }
+        });
+    });
+});
+
+app.get('/api/reports/trip/:id', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    
+    const tripQuery = `SELECT * FROM trips WHERE id = ?`;
+    const expensesQuery = `
+        SELECT e.*, c.name as category_name, pt.name as payment_type_name
+        FROM expenses e
+        JOIN categories c ON e.category_id = c.id
+        JOIN payment_types pt ON e.payment_type_id = pt.id
+        WHERE e.trip_id = ?
+    `;
+
+    db.get(tripQuery, [id], (err, trip) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        
+        if (!trip) {
+            return res.status(404).json({ error: 'Viagem não encontrada' });
+        }
+
+        db.all(expensesQuery, [id], (err, expenses) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+
+            const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+            const cashExpenses = expenses
+                .filter(expense => expense.payment_type_name === 'Dinheiro')
+                .reduce((sum, expense) => sum + expense.amount, 0);
+            
+            const remainingCash = trip.initial_cash - cashExpenses;
+            
+            const expensesByCategory = {};
+            const expensesByPaymentType = {};
+            
+            expenses.forEach(expense => {
+                expensesByCategory[expense.category_name] = 
+                    (expensesByCategory[expense.category_name] || 0) + expense.amount;
+                expensesByPaymentType[expense.payment_type_name] = 
+                    (expensesByPaymentType[expense.payment_type_name] || 0) + expense.amount;
+            });
+
+            res.json({
+                trip,
+                totalExpenses,
+                cashExpenses,
+                remainingCash,
+                expensesByCategory,
+                expensesByPaymentType,
+                expensesCount: expenses.length
+            });
+        });
+    });
+});
+
+// Servir arquivos estáticos
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Iniciar servidor
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor rodando em http://0.0.0.0:${PORT}`);
+    console.log(`Acesso local: http://localhost:${PORT}`);
+    console.log(`Acesso na rede: http://192.168.100.117:${PORT}`);
+});
+
+// Fechar banco ao encerrar aplicação
+process.on('SIGINT', () => {
+    db.close((err) => {
+        if (err) {
+            console.error(err.message);
+        }
+        console.log('Conexão com banco fechada.');
+        process.exit(0);
+    });
+});

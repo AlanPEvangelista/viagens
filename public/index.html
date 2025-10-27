@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Viagens</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-container">
+                <div class="logo">
+                    <i class="fas fa-route"></i>
+                    <h1>Controle de Viagens</h1>
+                </div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <input type="text" id="username" placeholder="Usuário" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="password" placeholder="Senha" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Entrar</button>
+                </form>
+                <div class="guest-login">
+                    <button id="guestLoginBtn" class="btn btn-secondary">Entrar como Convidado</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboardScreen" class="screen">
+            <header class="header">
+                <div class="header-content">
+                    <h1><i class="fas fa-route"></i> Controle de Viagens</h1>
+                    <div class="user-info">
+                        <span id="currentUser"></span>
+                        <button id="logoutBtn" class="btn btn-outline"><i class="fas fa-sign-out-alt"></i></button>
+                    </div>
+                </div>
+            </header>
+
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="trips">Viagens</button>
+                <button class="nav-tab" data-tab="expenses">Despesas</button>
+                <button class="nav-tab" data-tab="reports">Relatórios</button>
+                <button class="nav-tab admin-only" data-tab="admin">Admin</button>
+            </nav>
+
+            <!-- Trips Tab -->
+            <div id="tripsTab" class="tab-content active">
+                <div class="tab-header">
+                    <h2>Minhas Viagens</h2>
+                    <button id="newTripBtn" class="btn btn-primary admin-only">
+                        <i class="fas fa-plus"></i> Nova Viagem
+                    </button>
+                </div>
+                <div id="tripsList" class="trips-list"></div>
+            </div>
+
+            <!-- Expenses Tab -->
+            <div id="expensesTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Despesas</h2>
+                    <button id="newExpenseBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nova Despesa
+                    </button>
+                </div>
+                <div class="filters">
+                    <select id="tripFilter">
+                        <option value="">Todas as viagens</option>
+                    </select>
+                    <select id="categoryFilter">
+                        <option value="">Todas as categorias</option>
+                    </select>
+                </div>
+                <div id="expensesList" class="expenses-list"></div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="reportsTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Relatórios</h2>
+                </div>
+                <div class="reports-container">
+                    <div class="report-card">
+                        <h3>Resumo Financeiro</h3>
+                        <div id="financialSummary"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Tab -->
+            <div id="adminTab" class="tab-content admin-only">
+                <div class="tab-header">
+                    <h2>Administração</h2>
+                </div>
+                <div class="admin-sections">
+                    <div class="admin-card">
+                        <h3>Categorias de Despesas</h3>
+                        <div id="categoriesManagement"></div>
+                    </div>
+                    <div class="admin-card">
+                        <h3>Tipos de Pagamento</h3>
+                        <div id="paymentTypesManagement"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="tripModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nova Viagem</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="tripForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Destino Principal</label>
+                        <input type="text" id="mainDestination" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Motivo Principal</label>
+                        <input type="text" id="mainReason" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Outros Destinos</label>
+                    <textarea id="otherDestinations" placeholder="Destinos secundários (opcional)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Acompanhantes</label>
+                    <textarea id="companions" placeholder="Lista de acompanhantes"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Distância Aproximada (km)</label>
+                        <input type="number" id="distance" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Consumo do Veículo (km/l)</label>
+                        <input type="number" id="fuelConsumption" step="0.1">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data de Início</label>
+                        <input type="date" id="startDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Data de Fim</label>
+                        <input type="date" id="endDate" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Saldo Inicial em Dinheiro (R$)</label>
+                    <input type="number" id="initialCash" step="0.01" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('tripModal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="expenseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nova Despesa</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="expenseForm" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Viagem</label>
+                        <select id="expenseTripId" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Categoria</label>
+                        <select id="expenseCategory" required></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor (R$)</label>
+                        <input type="number" id="expenseAmount" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo de Pagamento</label>
+                        <select id="expensePaymentType" required></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <input type="text" id="expenseDescription" required>
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="expenseDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Recibo/Nota Fiscal</label>
+                    <input type="file" id="expenseReceipt" accept="image/*">
+                    <div id="receiptPreview"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('expenseModal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
