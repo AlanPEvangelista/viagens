@@ -118,7 +118,35 @@ chmod 755 database uploads logs
 
 ---
 
-## 9. Configurar Firewall (se necessário)
+## 9. Inicializar o Banco de Dados
+
+```bash
+# IMPORTANTE: Execute este comando primeiro para criar as tabelas
+node setup-database.js
+```
+
+Você deve ver uma saída similar a:
+```
+Inicializando banco de dados...
+Caminho do banco: /home/alan/controle-viagens/database/travel.db
+Conectado ao banco SQLite.
+Criando tabelas...
+✓ Tabela users criada/verificada
+✓ Tabela categories criada/verificada
+✓ Tabela payment_types criada/verificada
+✓ Tabela trips criada/verificada
+✓ Tabela expenses criada/verificada
+Inserindo dados padrão...
+✓ Usuário admin criado
+✓ Usuário guest criado
+✓ Categoria Combustível criada
+...
+🎉 Banco de dados inicializado com sucesso!
+```
+
+---
+
+## 10. Configurar Firewall (se necessário)
 
 ```bash
 # Verificar se o firewall está ativo
@@ -133,14 +161,21 @@ sudo ufw disable
 
 ---
 
-## 10. Testar a Aplicação
+## 11. Testar a Aplicação
 
 ```bash
-# Executar em modo de desenvolvimento
-npm start
-
-# Ou executar diretamente
+# Executar o servidor
 node server.js
+```
+
+Você deve ver:
+```
+Servidor rodando em http://0.0.0.0:8282
+Acesso local: http://localhost:8282
+Acesso na rede: http://192.168.100.117:8282
+Conectado ao banco SQLite.
+Verificando estrutura do banco...
+✓ Banco de dados verificado e pronto!
 ```
 
 **Acesso:** http://192.168.100.117:8282
@@ -216,7 +251,7 @@ sudo nano /etc/nginx/sites-available/controle-viagens
 **Conteúdo:**
 ```nginx
 server {
-    listen 80;
+    listen 8282;
     server_name 192.168.100.117;
 
     location / {
@@ -231,6 +266,12 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 }
+```
+
+**Ou, se preferir acesso direto sem Nginx (mais simples):**
+```bash
+# Pular a configuração do Nginx e acessar diretamente:
+# http://192.168.100.117:8282
 ```
 
 ### Ativar site

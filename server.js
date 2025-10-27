@@ -63,116 +63,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Inicializar estrutura do banco
 function initializeDatabase() {
-    // Tabela de usuários
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'guest',
-        name TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+    console.log('Verificando estrutura do banco...');
+    
+    // Habilitar foreign keys
+    db.run('PRAGMA foreign_keys = ON');
 
-    // Tabela de categorias
-    db.run(`CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        icon TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    // Tabela de tipos de pagamento
-    db.run(`CREATE TABLE IF NOT EXISTS payment_types (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        icon TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    // Tabela de viagens
-    db.run(`CREATE TABLE IF NOT EXISTS trips (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        main_destination TEXT NOT NULL,
-        main_reason TEXT NOT NULL,
-        other_destinations TEXT,
-        companions TEXT,
-        distance REAL,
-        fuel_consumption REAL,
-        estimated_fuel_cost REAL,
-        start_date DATE NOT NULL,
-        end_date DATE NOT NULL,
-        initial_cash REAL NOT NULL,
-        status TEXT DEFAULT 'planned',
-        created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (created_by) REFERENCES users (id)
-    )`);
-
-    // Tabela de despesas
-    db.run(`CREATE TABLE IF NOT EXISTS expenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trip_id INTEGER NOT NULL,
-        category_id INTEGER NOT NULL,
-        payment_type_id INTEGER NOT NULL,
-        amount REAL NOT NULL,
-        description TEXT NOT NULL,
-        date DATE NOT NULL,
-        receipt_path TEXT,
-        created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trip_id) REFERENCES trips (id) ON DELETE CASCADE,
-        FOREIGN KEY (category_id) REFERENCES categories (id),
-        FOREIGN KEY (payment_type_id) REFERENCES payment_types (id),
-        FOREIGN KEY (created_by) REFERENCES users (id)
-    )`);
-
-    // Inserir dados padrão
-    insertDefaultData();
-}
-
-function insertDefaultData() {
-    // Usuários padrão
-    const defaultUsers = [
-        { username: 'admin', password: 'admin123', role: 'admin', name: 'Administrador' },
-        { username: 'guest', password: 'guest123', role: 'guest', name: 'Convidado' }
-    ];
-
-    defaultUsers.forEach(user => {
-        bcrypt.hash(user.password, 10, (err, hash) => {
-            if (err) return;
-            db.run(`INSERT OR IGNORE INTO users (username, password, role, name) VALUES (?, ?, ?, ?)`,
-                [user.username, hash, user.role, user.name]);
-        });
-    });
-
-    // Categorias padrão
-    const defaultCategories = [
-        { name: 'Combustível', icon: 'fas fa-gas-pump' },
-        { name: 'Alimentação', icon: 'fas fa-utensils' },
-        { name: 'Hospedagem', icon: 'fas fa-bed' },
-        { name: 'Transporte', icon: 'fas fa-car' },
-        { name: 'Entretenimento', icon: 'fas fa-ticket-alt' },
-        { name: 'Compras', icon: 'fas fa-shopping-bag' },
-        { name: 'Outros', icon: 'fas fa-ellipsis-h' }
-    ];
-
-    defaultCategories.forEach(category => {
-        db.run(`INSERT OR IGNORE INTO categories (name, icon) VALUES (?, ?)`,
-            [category.name, category.icon]);
-    });
-
-    // Tipos de pagamento padrão
-    const defaultPaymentTypes = [
-        { name: 'Dinheiro', icon: 'fas fa-money-bill-wave' },
-        { name: 'Cartão de Crédito', icon: 'fas fa-credit-card' },
-        { name: 'Cartão de Débito', icon: 'fas fa-credit-card' },
-        { name: 'PIX', icon: 'fas fa-mobile-alt' },
-        { name: 'Transferência', icon: 'fas fa-exchange-alt' }
-    ];
-
-    defaultPaymentTypes.forEach(type => {
-        db.run(`INSERT OR IGNORE INTO payment_types (name, icon) VALUES (?, ?)`,
-            [type.name, type.icon]);
+    // Verificar se as tabelas existem
+    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='users'", (err, row) => {
+        if (err) {
+            console.error('Erro ao verificar tabelas:', err.message);
+            console.log('\n⚠️  ERRO: Execute primeiro o comando: node setup-database.js');
+            process.exit(1);
+        }
+        
+        if (!row) {
+            console.log('\n⚠️  BANCO NÃO INICIALIZADO!');
+            console.log('Execute primeiro: node setup-database.js');
+            console.log('Depois execute: node server.js\n');
+            process.exit(1);
+        } else {
+            console.log('✓ Banco de dados verificado e pronto!');
+        }
     });
 }
 
