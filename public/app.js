@@ -64,7 +64,7 @@ class TravelApp {
 
         try {
             const response = await fetch(url, config);
-            
+
             if (response.status === 401) {
                 this.handleLogout();
                 return null;
@@ -154,10 +154,10 @@ class TravelApp {
     showDashboard() {
         document.getElementById('loginScreen').classList.remove('active');
         document.getElementById('dashboardScreen').classList.add('active');
-        
+
         // Mostrar nome do usuário
         document.getElementById('currentUser').textContent = this.currentUser.name;
-        
+
         // Mostrar/ocultar elementos admin
         if (this.currentUser.role === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.add('show'));
@@ -183,7 +183,7 @@ class TravelApp {
         document.getElementById(`${tabName}Tab`).classList.add('active');
 
         // Recarregar dados se necessário
-        switch(tabName) {
+        switch (tabName) {
             case 'trips':
                 this.loadTrips();
                 break;
@@ -297,7 +297,7 @@ class TravelApp {
     openTripModal(trip = null) {
         const modal = document.getElementById('tripModal');
         const form = document.getElementById('tripForm');
-        
+
         if (trip) {
             // Edição
             document.querySelector('#tripModal .modal-header h3').textContent = 'Editar Viagem';
@@ -317,14 +317,14 @@ class TravelApp {
             form.reset();
             delete form.dataset.editId;
         }
-        
+
         this.openModal('tripModal');
     }
 
     async handleTripSubmit(e) {
         e.preventDefault();
         const form = e.target;
-        
+
         const tripData = {
             main_destination: document.getElementById('mainDestination').value,
             main_reason: document.getElementById('mainReason').value,
@@ -363,7 +363,7 @@ class TravelApp {
         const trips = await this.apiCall('/trips');
         const trip = trips.find(t => t.id === tripId);
         const newStatus = trip.status === 'active' ? 'completed' : 'active';
-        
+
         const result = await this.apiCall(`/trips/${tripId}`, {
             method: 'PUT',
             body: JSON.stringify({ ...trip, status: newStatus })
@@ -412,11 +412,11 @@ class TravelApp {
         // Aplicar filtros
         const tripFilter = document.getElementById('tripFilter').value;
         const categoryFilter = document.getElementById('categoryFilter').value;
-        
+
         if (tripFilter) {
             expenses = expenses.filter(expense => expense.trip_id === parseInt(tripFilter));
         }
-        
+
         if (categoryFilter) {
             expenses = expenses.filter(expense => expense.category_name === categoryFilter);
         }
@@ -482,10 +482,10 @@ class TravelApp {
     async openExpenseModal(expense = null) {
         const modal = document.getElementById('expenseModal');
         const form = document.getElementById('expenseForm');
-        
+
         // Popular selects
         await this.populateExpenseSelects();
-        
+
         if (expense) {
             // Edição
             document.querySelector('#expenseModal .modal-header h3').textContent = 'Editar Despesa';
@@ -503,7 +503,7 @@ class TravelApp {
             document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
             delete form.dataset.editId;
         }
-        
+
         this.openModal('expenseModal');
     }
 
@@ -531,7 +531,7 @@ class TravelApp {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData();
-        
+
         formData.append('trip_id', document.getElementById('expenseTripId').value);
         formData.append('category_id', document.getElementById('expenseCategory').value);
         formData.append('amount', document.getElementById('expenseAmount').value);
@@ -578,7 +578,7 @@ class TravelApp {
     handleReceiptPreview(e) {
         const file = e.target.files[0];
         const preview = document.getElementById('receiptPreview');
-        
+
         if (file) {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -616,7 +616,7 @@ class TravelApp {
 
         const summary = await this.apiCall('/reports/summary');
         if (!summary) return;
-        
+
         container.innerHTML = `
             <div class="expense-info">
                 <div class="info-item">
@@ -646,7 +646,7 @@ class TravelApp {
     // Administração
     async loadAdminData() {
         if (this.currentUser.role !== 'admin') return;
-        
+
         await this.loadCategoriesManagement();
         await this.loadPaymentTypesManagement();
     }
@@ -656,7 +656,7 @@ class TravelApp {
         if (!categories) return;
 
         const container = document.getElementById('categoriesManagement');
-        
+
         container.innerHTML = `
             <div style="margin-bottom: 20px;">
                 <button class="btn btn-primary" onclick="app.addCategory()">
@@ -686,7 +686,7 @@ class TravelApp {
         if (!paymentTypes) return;
 
         const container = document.getElementById('paymentTypesManagement');
-        
+
         container.innerHTML = `
             <div style="margin-bottom: 20px;">
                 <button class="btn btn-primary" onclick="app.addPaymentType()">
@@ -714,7 +714,7 @@ class TravelApp {
     async addCategory() {
         const name = prompt('Nome da categoria:');
         const icon = prompt('Classe do ícone (ex: fas fa-car):', 'fas fa-tag');
-        
+
         if (name && icon) {
             const result = await this.apiCall('/categories', {
                 method: 'POST',
@@ -728,14 +728,82 @@ class TravelApp {
         }
     }
 
+    async editCategory(categoryId) {
+        const categories = await this.apiCall('/categories');
+        const category = categories.find(c => c.id === categoryId);
+
+        if (!category) return;
+
+        const name = prompt('Nome da categoria:', category.name);
+        const icon = prompt('Classe do ícone:', category.icon);
+
+        if (name && icon) {
+            const result = await this.apiCall(`/categories/${categoryId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, icon })
+            });
+
+            if (result) {
+                this.loadCategoriesManagement();
+                this.populateFilters();
+            }
+        }
+    }
+
+    async deleteCategory(categoryId) {
+        if (confirm('Tem certeza que deseja excluir esta categoria?')) {
+            const result = await this.apiCall(`/categories/${categoryId}`, {
+                method: 'DELETE'
+            });
+
+            if (result) {
+                this.loadCategoriesManagement();
+                this.populateFilters();
+            }
+        }
+    }
+
     async addPaymentType() {
         const name = prompt('Nome do tipo de pagamento:');
         const icon = prompt('Classe do ícone (ex: fas fa-credit-card):', 'fas fa-money-bill');
-        
+
         if (name && icon) {
             const result = await this.apiCall('/payment-types', {
                 method: 'POST',
                 body: JSON.stringify({ name, icon })
+            });
+
+            if (result) {
+                this.loadPaymentTypesManagement();
+            }
+        }
+    }
+
+    async editPaymentType(typeId) {
+        const paymentTypes = await this.apiCall('/payment-types');
+        const type = paymentTypes.find(t => t.id === typeId);
+
+        if (!type) return;
+
+        const name = prompt('Nome do tipo de pagamento:', type.name);
+        const icon = prompt('Classe do ícone:', type.icon);
+
+        if (name && icon) {
+            const result = await this.apiCall(`/payment-types/${typeId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, icon })
+            });
+
+            if (result) {
+                this.loadPaymentTypesManagement();
+            }
+        }
+    }
+
+    async deletePaymentType(typeId) {
+        if (confirm('Tem certeza que deseja excluir este tipo de pagamento?')) {
+            const result = await this.apiCall(`/payment-types/${typeId}`, {
+                method: 'DELETE'
             });
 
             if (result) {

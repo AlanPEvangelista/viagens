@@ -349,6 +349,46 @@ app.post('/api/categories', authenticateToken, requireAdmin, (req, res) => {
     );
 });
 
+app.put('/api/categories/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const { name, icon } = req.body;
+
+    db.run(`UPDATE categories SET name = ?, icon = ? WHERE id = ?`,
+        [name, icon, id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Categoria atualizada com sucesso' });
+        }
+    );
+});
+
+app.delete('/api/categories/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+
+    // Primeiro verificar se há despesas usando esta categoria
+    db.get(`SELECT COUNT(*) as count FROM expenses WHERE category_id = ?`, [id], (err, row) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (row.count > 0) {
+            return res.status(400).json({ 
+                error: `Não é possível excluir esta categoria. Existem ${row.count} despesa(s) cadastrada(s) com esta categoria.` 
+            });
+        }
+
+        // Se não há despesas, pode excluir
+        db.run(`DELETE FROM categories WHERE id = ?`, [id], function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Categoria excluída com sucesso' });
+        });
+    });
+});
+
 // Rotas de tipos de pagamento
 app.get('/api/payment-types', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM payment_types ORDER BY name`, (err, rows) => {
@@ -371,6 +411,46 @@ app.post('/api/payment-types', authenticateToken, requireAdmin, (req, res) => {
             res.json({ id: this.lastID, message: 'Tipo de pagamento criado com sucesso' });
         }
     );
+});
+
+app.put('/api/payment-types/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const { name, icon } = req.body;
+
+    db.run(`UPDATE payment_types SET name = ?, icon = ? WHERE id = ?`,
+        [name, icon, id],
+        function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Tipo de pagamento atualizado com sucesso' });
+        }
+    );
+});
+
+app.delete('/api/payment-types/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+
+    // Primeiro verificar se há despesas usando este tipo de pagamento
+    db.get(`SELECT COUNT(*) as count FROM expenses WHERE payment_type_id = ?`, [id], (err, row) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (row.count > 0) {
+            return res.status(400).json({ 
+                error: `Não é possível excluir este tipo de pagamento. Existem ${row.count} despesa(s) cadastrada(s) com este tipo de pagamento.` 
+            });
+        }
+
+        // Se não há despesas, pode excluir
+        db.run(`DELETE FROM payment_types WHERE id = ?`, [id], function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Tipo de pagamento excluído com sucesso' });
+        });
+    });
 });
 
 // Rota para servir imagens de recibos

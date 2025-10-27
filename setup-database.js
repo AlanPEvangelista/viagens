@@ -20,9 +20,64 @@ const db = new sqlite3.Database(dbPath, (err) => {
         process.exit(1);
     } else {
         console.log('Conectado ao banco SQLite.');
-        initializeDatabase();
+        checkExistingData();
     }
 });
+
+function checkExistingData() {
+    // Verificar se já existem dados
+    db.get("SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='categories'", (err, row) => {
+        if (err || !row) {
+            initializeDatabase();
+            return;
+        }
+        
+        db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
+            if (err) {
+                initializeDatabase();
+                return;
+            }
+            
+            if (row && row.count > 0) {
+                console.log('⚠️  Dados já existem no banco!');
+                console.log('Deseja limpar e recriar? (y/N)');
+                
+                // Para automação, vamos limpar duplicatas
+                cleanDuplicates();
+            } else {
+                initializeDatabase();
+            }
+        });
+    });
+}
+
+function cleanDuplicates() {
+    console.log('Limpando duplicatas...');
+    
+    // Limpar duplicatas de categorias
+    db.run(`DELETE FROM categories WHERE id NOT IN (
+        SELECT MIN(id) FROM categories GROUP BY name
+    )`, (err) => {
+        if (err) {
+            console.error('Erro ao limpar categorias:', err.message);
+        } else {
+            console.log('✓ Duplicatas de categorias removidas');
+        }
+        
+        // Limpar duplicatas de tipos de pagamento
+        db.run(`DELETE FROM payment_types WHERE id NOT IN (
+            SELECT MIN(id) FROM payment_types GROUP BY name
+        )`, (err) => {
+            if (err) {
+                console.error('Erro ao limpar tipos de pagamento:', err.message);
+            } else {
+                console.log('✓ Duplicatas de tipos de pagamento removidas');
+            }
+            
+            finishSetup();
+        });
+    });
+}
 
 function initializeDatabase() {
     console.log('Criando tabelas...');
@@ -227,13 +282,20 @@ function insertPaymentTypes() {
 }
 
 function finishSetup() {
-    console.log('\n🎉 Banco de dados inicializado com sucesso!');
-    console.log('\nTabelas criadas:');
-    console.log('- users (usuários)');
-    console.log('- categories (categorias)');
-    console.log('- payment_types (tipos de pagamento)');
-    console.log('- trips (viagens)');
-    console.log('- expenses (despesas)');
+    console.log('\n🎉 Banco de dados verificado/inicializado com sucesso!');
+    
+    // Mostrar contadores finais
+    db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
+        if (!err && row) {
+            console.log(`📊 Categorias: ${row.count}`);
+        }
+    });
+    
+    db.get("SELECT COUNT(*) as count FROM payment_types", (err, row) => {
+        if (!err && row) {
+            console.log(`💳 Tipos de pagamento: ${row.count}`);
+        }
+    });
     
     console.log('\nUsuários padrão:');
     console.log('- admin / admin123 (Administrador)');
