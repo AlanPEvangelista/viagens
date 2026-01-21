@@ -698,6 +698,23 @@ class TravelApp {
         `;
     }
 
+    async addCategory() {
+        const name = prompt('Nome da categoria:');
+        const icon = prompt('Classe do ícone (ex: fas fa-car):', 'fas fa-tag');
+
+        if (name && icon) {
+            const result = await this.apiCall('/categories', {
+                method: 'POST',
+                body: JSON.stringify({ name, icon })
+            });
+
+            if (result) {
+                this.loadCategoriesManagement();
+                this.populateFilters();
+            }
+        }
+    }
+
     async editCategory(categoryId) {
         const categories = await this.apiCall('/categories');
         const category = categories.find(c => c.id === categoryId);
@@ -720,6 +737,35 @@ class TravelApp {
         }
     }
 
+    async deleteCategory(categoryId) {
+        if (confirm('Tem certeza que deseja excluir esta categoria?')) {
+            const result = await this.apiCall(`/categories/${categoryId}`, {
+                method: 'DELETE'
+            });
+
+            if (result) {
+                this.loadCategoriesManagement();
+                this.populateFilters();
+            }
+        }
+    }
+
+    async addPaymentType() {
+        const name = prompt('Nome do tipo de pagamento:');
+        const icon = prompt('Classe do ícone (ex: fas fa-credit-card):', 'fas fa-money-bill');
+
+        if (name && icon) {
+            const result = await this.apiCall('/payment-types', {
+                method: 'POST',
+                body: JSON.stringify({ name, icon })
+            });
+
+            if (result) {
+                this.loadPaymentTypesManagement();
+            }
+        }
+    }
+
     async editPaymentType(typeId) {
         const paymentTypes = await this.apiCall('/payment-types');
         const type = paymentTypes.find(t => t.id === typeId);
@@ -738,6 +784,59 @@ class TravelApp {
             if (result) {
                 this.loadPaymentTypesManagement();
             }
+        }
+    }
+
+    async deletePaymentType(typeId) {
+        if (confirm('Tem certeza que deseja excluir este tipo de pagamento?')) {
+            const result = await this.apiCall(`/payment-types/${typeId}`, {
+                method: 'DELETE'
+            });
+
+            if (result) {
+                this.loadPaymentTypesManagement();
+            }
+        }
+    }
+
+    // Filtros
+    async populateFilters() {
+        // Filtro de viagens
+        const trips = await this.apiCall('/trips');
+        if (trips) {
+            const tripFilter = document.getElementById('tripFilter');
+            const currentValue = tripFilter.value;
+            tripFilter.innerHTML = '<option value="">Todas as viagens</option>' +
+                trips.map(trip => `<option value="${trip.id}">${trip.main_destination} (${this.formatDate(trip.start_date)})</option>`).join('');
+            tripFilter.value = currentValue;
+        }
+
+        // Filtro de categorias
+        const categories = await this.apiCall('/categories');
+        if (categories) {
+            const categoryFilter = document.getElementById('categoryFilter');
+            const currentCategoryValue = categoryFilter.value;
+            categoryFilter.innerHTML = '<option value="">Todas as categorias</option>' +
+                categories.map(category => `<option value="${category.name}">${category.name}</option>`).join('');
+            categoryFilter.value = currentCategoryValue;
+        }
+    }
+
+    // Utilitários
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pt-BR');
+    }
+
+    openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+    }
+
+    closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+        // Limpar preview de recibo
+        if (modalId === 'expenseModal') {
+            document.getElementById('receiptPreview').innerHTML = '';
         }
     }
 
@@ -983,47 +1082,6 @@ class TravelApp {
         document.getElementById('categoryLegend').innerHTML = '';
         document.getElementById('paymentLegend').innerHTML = '';
     }
-
-    // Filtros
-    async populateFilters() {
-        // Filtro de viagens
-        const trips = await this.apiCall('/trips');
-        if (trips) {
-            const tripFilter = document.getElementById('tripFilter');
-            const currentValue = tripFilter.value;
-            tripFilter.innerHTML = '<option value="">Todas as viagens</option>' +
-                trips.map(trip => `<option value="${trip.id}">${trip.main_destination} (${this.formatDate(trip.start_date)})</option>`).join('');
-            tripFilter.value = currentValue;
-        }
-
-        // Filtro de categorias
-        const categories = await this.apiCall('/categories');
-        if (categories) {
-            const categoryFilter = document.getElementById('categoryFilter');
-            const currentCategoryValue = categoryFilter.value;
-            categoryFilter.innerHTML = '<option value="">Todas as categorias</option>' +
-                categories.map(category => `<option value="${category.name}">${category.name}</option>`).join('');
-            categoryFilter.value = currentCategoryValue;
-        }
-    }
-
-    // Utilitários
-    formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('pt-BR');
-    }
-
-    openModal(modalId) {
-        document.getElementById(modalId).classList.add('active');
-    }
-
-    closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('active');
-        // Limpar preview de recibo
-        if (modalId === 'expenseModal') {
-            document.getElementById('receiptPreview').innerHTML = '';
-        }
-    }
 }
 
 // Função global para fechar modal (usada no HTML)
@@ -1033,3 +1091,130 @@ function closeModal(modalId) {
 
 // Inicializar aplicação
 const app = new TravelApp();
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const item = categoryData.data[context.dataIndex];
+                            return `${item.category}: ${item.percentage}% (R$ ${item.amount.toFixed(2)})`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Criar legenda personalizada
+    this.createCustomLegend('categoryLegend', categoryData.data, backgroundColors, 'category');
+}
+
+createPaymentChart(paymentData) {
+    const ctx = document.getElementById('paymentChart').getContext('2d');
+
+    // Destruir gráfico anterior se existir
+    if (this.paymentChart) {
+        this.paymentChart.destroy();
+    }
+
+    const colors = [
+        '#28a745', '#dc3545', '#2a5298', '#ffc107', '#17a2b8',
+        '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+    ];
+
+    const labels = paymentData.data.map(item => item.paymentType);
+    const data = paymentData.data.map(item => parseFloat(item.percentage));
+    const backgroundColors = colors.slice(0, labels.length);
+
+    this.paymentChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: backgroundColors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const item = paymentData.data[context.dataIndex];
+                            return `${item.paymentType}: ${item.percentage}% (R$ ${item.amount.toFixed(2)})`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Criar legenda personalizada
+    this.createCustomLegend('paymentLegend', paymentData.data, backgroundColors, 'paymentType');
+}
+
+createCustomLegend(containerId, data, colors, typeKey) {
+    const container = document.getElementById(containerId);
+
+    container.innerHTML = data.map((item, index) => {
+        const label = typeKey === 'category' ? item.category : item.paymentType;
+        return `
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: ${colors[index]}"></div>
+                    <span class="legend-label">${label}:</span>
+                    <span class="legend-value">${item.percentage}%</span>
+                </div>
+            `;
+    }).join('');
+}
+
+showEmptyCharts() {
+    // Destruir gráficos existentes
+    if (this.categoryChart) {
+        this.categoryChart.destroy();
+    }
+    if (this.paymentChart) {
+        this.paymentChart.destroy();
+    }
+
+    // Mostrar mensagem de dados vazios
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    const paymentCtx = document.getElementById('paymentChart').getContext('2d');
+
+    categoryCtx.clearRect(0, 0, categoryCtx.canvas.width, categoryCtx.canvas.height);
+    paymentCtx.clearRect(0, 0, paymentCtx.canvas.width, paymentCtx.canvas.height);
+
+    categoryCtx.font = '16px Arial';
+    categoryCtx.fillStyle = '#6c757d';
+    categoryCtx.textAlign = 'center';
+    categoryCtx.fillText('Nenhuma despesa encontrada', categoryCtx.canvas.width / 2, categoryCtx.canvas.height / 2);
+
+    paymentCtx.font = '16px Arial';
+    paymentCtx.fillStyle = '#6c757d';
+    paymentCtx.textAlign = 'center';
+    paymentCtx.fillText('Nenhuma despesa encontrada', paymentCtx.canvas.width / 2, paymentCtx.canvas.height / 2);
+
+    // Limpar legendas
+    document.getElementById('categoryLegend').innerHTML = '';
+    document.getElementById('paymentLegend').innerHTML = '';
+}

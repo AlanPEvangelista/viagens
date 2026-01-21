@@ -1,0 +1,141 @@
+# === SISTEMA DE CONTROLE DE VIAGENS ===
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+#package-lock.json
+.npm
+.yarn-integrity
+
+# Logs do sistema
+logs/
+*.log
+combined.log
+error.log
+out.log
+err.log
+
+# Banco de dados SQLite
+database/
+*.db
+*.sqlite
+*.sqlite3
+travel.db
+travel_backup_*.db
+
+# Uploads e arquivos de usuário
+uploads/
+receipts/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.pdf
+receipt-*
+
+# Backups
+backups/
+*.backup
+backup_*
+
+# Arquivos temporários
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Configurações de ambiente
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+config.local.js
+ecosystem.config.local.js
+
+# PM2
+.pm2/
+pm2.log
+ecosystem.config.production.js
+
+# Arquivos do sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# Arquivos de desenvolvimento
+*.orig
+*.rej
+.nyc_output
+coverage/
+.coverage
+htmlcov/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Arquivos de build/dist
+dist/
+build/
+out/
+
+# Arquivos específicos do Windows
+*.lnk
+*.exe
+*.msi
+
+# Arquivos específicos do Linux/Mac
+*.deb
+*.rpm
+*.dmg
+
+# Certificados e chaves
+*.pem
+*.key
+*.crt
+*.p12
+ssl/
+certs/
+
+# Arquivos de sessão
+sessions/
+*.session
+
+# Arquivos de teste
+test-results/
+coverage-reports/
+
+# Arquivos grandes que não devem ir para o repositório
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Arquivos de configuração local específicos do projeto
+server.local.js
+database.local.js
+config.local.json
+
+# Arquivos gerados automaticamente
+auto-generated/
+generated/
