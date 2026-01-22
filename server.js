@@ -15,7 +15,17 @@ const JWT_SECRET = process.env.JWT_SECRET || 'travel_secret_key_2024';
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Configuração de cache para arquivos estáticos (desabilitar cache para evitar problemas de atualização)
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.html') || path.endsWith('.js') || path.endsWith('.css')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 // Configuração do multer para upload de arquivos
 const storage = multer.diskStorage({
