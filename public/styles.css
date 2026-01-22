@@ -160,6 +160,41 @@ body {
     gap: 15px;
 }
 
+.header-with-filters, .header-with-total {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.header-filters {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-input {
+    padding: 8px 12px;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.filter-input:focus {
+    border-color: var(--primary-blue);
+}
+
+.total-badge {
+    background: var(--success-green);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 1rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
 .tab-header h2 {
     color: var(--white);
     font-size: 2rem;

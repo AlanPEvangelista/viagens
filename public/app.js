@@ -45,6 +45,20 @@ class TravelApp {
         // Filtros
         document.getElementById('tripFilter').addEventListener('change', () => this.loadExpenses());
         document.getElementById('categoryFilter').addEventListener('change', () => this.loadExpenses());
+
+        // Filtros de Viagens (Minhas Viagens)
+        document.getElementById('tripLocationFilter').addEventListener('input', () => this.loadTrips());
+        document.getElementById('tripDateFilter').addEventListener('change', () => this.loadTrips());
+
+        // Usuários
+        const newUserBtn = document.getElementById('newUserBtn');
+        if (newUserBtn) newUserBtn.addEventListener('click', () => this.openUserModal());
+        
+        const userForm = document.getElementById('userForm');
+        if (userForm) userForm.addEventListener('submit', (e) => this.handleUserSubmit(e));
+
+        const resetPasswordForm = document.getElementById('resetPasswordForm');
+        if (resetPasswordForm) resetPasswordForm.addEventListener('submit', (e) => this.handleResetPasswordSubmit(e));
     }
 
     // Métodos de API
@@ -177,7 +191,6 @@ class TravelApp {
         this.loadTrips();
         this.loadExpenses();
         this.loadReports();
-        this.loadAdminData();
         this.populateFilters();
     }
 
@@ -204,9 +217,161 @@ class TravelApp {
             case 'charts':
                 this.loadCharts();
                 break;
-            case 'admin':
-                this.loadAdminData();
+            case 'users':
+                this.loadUsers();
                 break;
+        }
+    }
+
+    // Gerenciamento de Usuários
+    async loadUsers() {
+        if (this.currentUser.role !== 'admin') return;
+
+        const container = document.getElementById('usersList');
+        container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Carregando...</div>';
+
+        const users = await this.apiCall('/users');
+        if (!users) return;
+
+        if (users.length === 0) {
+            container.innerHTML = '<p class="text-center">Nenhum usuário cadastrado.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="users-table" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <thead style="background: #f8f9fa;">
+                    <tr>
+                        <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e9ecef;">Nome</th>
+                        <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e9ecef;">Usuário</th>
+                        <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e9ecef;">Perfil</th>
+                        <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e9ecef;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${users.map(user => `
+                        <tr style="border-bottom: 1px solid #e9ecef;">
+                            <td style="padding: 12px 15px;">${user.name}</td>
+                            <td style="padding: 12px 15px;">${user.username}</td>
+                            <td style="padding: 12px 15px;">
+                                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; background: ${user.role === 'admin' ? '#e3f2fd' : '#e9ecef'}; color: ${user.role === 'admin' ? '#0d6efd' : '#495057'};">
+                                    ${user.role === 'admin' ? 'Administrador' : 'Usuário'}
+                                </span>
+                            </td>
+                            <td style="padding: 12px 15px;">
+                                <button class="btn btn-sm btn-secondary" onclick="app.openUserModal({id: ${user.id}, name: '${user.name}', username: '${user.username}', role: '${user.role}'})" style="padding: 4px 8px; margin-right: 5px;">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="app.openResetPasswordModal(${user.id}, '${user.name}')" title="Resetar Senha" style="padding: 4px 8px; margin-right: 5px; background: #ffc107; color: #000; border: none;">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                                ${user.id !== this.currentUser.id ? `
+                                <button class="btn btn-sm btn-danger" onclick="app.deleteUser(${user.id})" style="padding: 4px 8px;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    openUserModal(user = null) {
+        const modal = document.getElementById('userModal');
+        const form = document.getElementById('userForm');
+        const title = document.getElementById('userModalTitle');
+        const passwordGroup = document.getElementById('passwordGroup');
+        const passwordInput = document.getElementById('userPassword');
+        const hint = passwordGroup.querySelector('.hint');
+
+        if (user) {
+            title.textContent = 'Editar Usuário';
+            document.getElementById('userId').value = user.id;
+            document.getElementById('userName').value = user.name;
+            document.getElementById('userUsername').value = user.username;
+            document.getElementById('userRole').value = user.role;
+            
+            passwordInput.required = false;
+            hint.style.display = 'block';
+            form.dataset.mode = 'edit';
+        } else {
+            title.textContent = 'Novo Usuário';
+            form.reset();
+            document.getElementById('userId').value = '';
+            
+            passwordInput.required = true;
+            hint.style.display = 'none';
+            form.dataset.mode = 'create';
+        }
+
+        this.openModal('userModal');
+    }
+
+    async handleUserSubmit(e) {
+        e.preventDefault();
+        const mode = e.target.dataset.mode;
+        const id = document.getElementById('userId').value;
+        const name = document.getElementById('userName').value;
+        const username = document.getElementById('userUsername').value;
+        const password = document.getElementById('userPassword').value;
+        const role = document.getElementById('userRole').value;
+
+        const data = { name, username, role };
+        if (password) data.password = password;
+
+        let result;
+        if (mode === 'edit') {
+            result = await this.apiCall(`/users/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        } else {
+            result = await this.apiCall('/users', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (result) {
+            this.closeModal('userModal');
+            this.loadUsers();
+        }
+    }
+
+    async deleteUser(id) {
+        if (confirm('Tem certeza que deseja excluir este usuário?')) {
+            const result = await this.apiCall(`/users/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (result) {
+                this.loadUsers();
+            }
+        }
+    }
+
+    openResetPasswordModal(id, name) {
+        document.getElementById('resetUserId').value = id;
+        document.getElementById('resetUserName').textContent = name;
+        document.getElementById('newPassword').value = '';
+        this.openModal('resetPasswordModal');
+    }
+
+    async handleResetPasswordSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('resetUserId').value;
+        const newPassword = document.getElementById('newPassword').value;
+
+        const result = await this.apiCall(`/users/${id}/reset-password`, {
+            method: 'POST',
+            body: JSON.stringify({ newPassword })
+        });
+
+        if (result) {
+            alert('Senha resetada com sucesso!');
+            this.closeModal('resetPasswordModal');
         }
     }
 
@@ -215,11 +380,30 @@ class TravelApp {
         const container = document.getElementById('tripsList');
         container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Carregando...</div>';
 
-        const trips = await this.apiCall('/trips');
+        let trips = await this.apiCall('/trips');
         if (!trips) return;
 
+        // Filtros de viagens
+        const locationFilter = document.getElementById('tripLocationFilter').value.toLowerCase();
+        const dateFilter = document.getElementById('tripDateFilter').value;
+
+        if (locationFilter) {
+            trips = trips.filter(trip => 
+                trip.main_destination.toLowerCase().includes(locationFilter) || 
+                (trip.other_destinations && trip.other_destinations.toLowerCase().includes(locationFilter))
+            );
+        }
+
+        if (dateFilter) {
+            trips = trips.filter(trip => {
+                const start = trip.start_date.split('T')[0];
+                const end = trip.end_date.split('T')[0];
+                return dateFilter >= start && dateFilter <= end;
+            });
+        }
+
         if (trips.length === 0) {
-            container.innerHTML = '<p class="text-center">Nenhuma viagem cadastrada ainda.</p>';
+            container.innerHTML = '<p class="text-center">Nenhuma viagem encontrada.</p>';
             return;
         }
 
@@ -427,6 +611,7 @@ class TravelApp {
     // Gerenciamento de Despesas
     async loadExpenses() {
         const container = document.getElementById('expensesList');
+        const totalDisplay = document.getElementById('totalExpensesDisplay');
         container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Carregando...</div>';
 
         let expenses = await this.apiCall('/expenses');
@@ -442,6 +627,12 @@ class TravelApp {
 
         if (categoryFilter) {
             expenses = expenses.filter(expense => expense.category_name === categoryFilter);
+        }
+
+        // Calcular total
+        const total = expenses.reduce((sum, expense) => sum + parseFloat(expense.amount), 0);
+        if (totalDisplay) {
+            totalDisplay.textContent = `Total: R$ ${total.toFixed(2)}`;
         }
 
         if (expenses.length === 0) {
@@ -674,145 +865,8 @@ class TravelApp {
         `;
     }
 
-    // Administração
-    async loadAdminData() {
-        if (this.currentUser.role !== 'admin') return;
+    // Administração (Removido conforme solicitação)
 
-        await this.loadCategoriesManagement();
-        await this.loadPaymentTypesManagement();
-    }
-
-    async loadCategoriesManagement() {
-        const categories = await this.apiCall('/categories');
-        if (!categories) return;
-
-        const container = document.getElementById('categoriesManagement');
-
-        container.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <button class="btn btn-primary" onclick="app.addCategory()">
-                    <i class="fas fa-plus"></i> Nova Categoria
-                </button>
-            </div>
-            <div class="categories-list">
-                ${categories.map(category => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 10px; background: white;">
-                        <span style="font-size: 1.1rem;"><i class="${category.icon}"></i> ${category.name}</span>
-                        <div>
-                            <button class="btn btn-secondary" onclick="app.editCategory(${category.id})" style="padding: 8px 15px;">
-                                <i class="fas fa-edit"></i> Editar
-                            </button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    async loadPaymentTypesManagement() {
-        const paymentTypes = await this.apiCall('/payment-types');
-        if (!paymentTypes) return;
-
-        const container = document.getElementById('paymentTypesManagement');
-
-        container.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <button class="btn btn-primary" onclick="app.addPaymentType()">
-                    <i class="fas fa-plus"></i> Novo Tipo
-                </button>
-            </div>
-            <div class="payment-types-list">
-                ${paymentTypes.map(type => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 10px; background: white;">
-                        <span style="font-size: 1.1rem;"><i class="${type.icon}"></i> ${type.name}</span>
-                        <div>
-                            <button class="btn btn-secondary" onclick="app.editPaymentType(${type.id})" style="padding: 8px 15px;">
-                                <i class="fas fa-edit"></i> Editar
-                            </button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
-    async addCategory() {
-        const name = prompt('Nome da nova categoria:');
-        if (!name) return;
-        
-        const icon = prompt('Classe do ícone (ex: fas fa-tag):', 'fas fa-tag');
-        if (!icon) return;
-
-        const result = await this.apiCall('/categories', {
-            method: 'POST',
-            body: JSON.stringify({ name, icon })
-        });
-
-        if (result) {
-            this.loadCategoriesManagement();
-            this.populateFilters();
-        }
-    }
-
-    async addPaymentType() {
-        const name = prompt('Nome do novo tipo de pagamento:');
-        if (!name) return;
-        
-        const icon = prompt('Classe do ícone (ex: fas fa-money-bill):', 'fas fa-money-bill');
-        if (!icon) return;
-
-        const result = await this.apiCall('/payment-types', {
-            method: 'POST',
-            body: JSON.stringify({ name, icon })
-        });
-
-        if (result) {
-            this.loadPaymentTypesManagement();
-        }
-    }
-
-    async editCategory(categoryId) {
-        const categories = await this.apiCall('/categories');
-        const category = categories.find(c => c.id === categoryId);
-
-        if (!category) return;
-
-        const name = prompt('Nome da categoria:', category.name);
-        const icon = prompt('Classe do ícone:', category.icon);
-
-        if (name && icon) {
-            const result = await this.apiCall(`/categories/${categoryId}`, {
-                method: 'PUT',
-                body: JSON.stringify({ name, icon })
-            });
-
-            if (result) {
-                this.loadCategoriesManagement();
-                this.populateFilters();
-            }
-        }
-    }
-
-    async editPaymentType(typeId) {
-        const paymentTypes = await this.apiCall('/payment-types');
-        const type = paymentTypes.find(t => t.id === typeId);
-
-        if (!type) return;
-
-        const name = prompt('Nome do tipo de pagamento:', type.name);
-        const icon = prompt('Classe do ícone:', type.icon);
-
-        if (name && icon) {
-            const result = await this.apiCall(`/payment-types/${typeId}`, {
-                method: 'PUT',
-                body: JSON.stringify({ name, icon })
-            });
-
-            if (result) {
-                this.loadPaymentTypesManagement();
-            }
-        }
-    }
 
     // Gráficos
     async loadCharts() {

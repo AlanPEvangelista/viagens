@@ -507,6 +507,66 @@ app.get('/api/reports/summary', authenticateToken, (req, res) => {
     });
 });
 
+// Rotas de Usuários
+app.get('/api/users', authenticateToken, requireAdmin, (req, res) => {
+    db.all('SELECT id, username, role, name, created_at FROM users ORDER BY name', (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
+    const { username, password, name, role } = req.body;
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        db.run('INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)',
+            [username, hashedPassword, name, role || 'user'],
+            function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ id: this.lastID, message: 'Usuário criado com sucesso' });
+            }
+        );
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao criar usuário' });
+    }
+});
+
+app.put('/api/users/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const { name, role, username } = req.body;
+    db.run('UPDATE users SET name = ?, role = ?, username = ? WHERE id = ?',
+        [name, role, username, id],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: 'Usuário atualizado com sucesso' });
+        }
+    );
+});
+
+app.delete('/api/users/:id', authenticateToken, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    if (id == req.user.id) return res.status(400).json({ error: 'Não é possível excluir o próprio usuário' });
+    
+    db.run('DELETE FROM users WHERE id = ?', [id], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: 'Usuário excluído com sucesso' });
+    });
+});
+
+app.post('/api/users/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    try {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ message: 'Senha resetada com sucesso' });
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao resetar senha' });
+    }
+});
+
 app.get('/api/reports/trip/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
     

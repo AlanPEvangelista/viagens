@@ -49,13 +49,19 @@
                 <button class="nav-tab" data-tab="expenses">Despesas</button>
                 <button class="nav-tab" data-tab="reports">Relatórios</button>
                 <button class="nav-tab" data-tab="charts">Gráficos</button>
-                <button class="nav-tab admin-only" data-tab="admin">Admin</button>
+                <button class="nav-tab admin-only" data-tab="users">Usuários</button>
             </nav>
 
             <!-- Trips Tab -->
             <div id="tripsTab" class="tab-content active">
                 <div class="tab-header">
-                    <h2>Minhas Viagens</h2>
+                    <div class="header-with-filters">
+                        <h2>Minhas Viagens</h2>
+                        <div class="header-filters">
+                            <input type="text" id="tripLocationFilter" placeholder="Filtrar por local..." class="filter-input">
+                            <input type="date" id="tripDateFilter" class="filter-input">
+                        </div>
+                    </div>
                     <button id="newTripBtn" class="btn btn-primary admin-only">
                         <i class="fas fa-plus"></i> Nova Viagem
                     </button>
@@ -66,7 +72,10 @@
             <!-- Expenses Tab -->
             <div id="expensesTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>Despesas</h2>
+                    <div class="header-with-total">
+                        <h2>Despesas</h2>
+                        <span id="totalExpensesDisplay" class="total-badge">Total: R$ 0,00</span>
+                    </div>
                     <button id="newExpenseBtn" class="btn btn-primary">
                         <i class="fas fa-plus"></i> Nova Despesa
                     </button>
@@ -126,26 +135,76 @@
                 </div>
             </div>
 
-            <!-- Admin Tab -->
-            <div id="adminTab" class="tab-content admin-only">
+            <!-- Users Tab -->
+            <div id="usersTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>Administração</h2>
+                    <h2>Gerenciamento de Usuários</h2>
+                    <button id="newUserBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Novo Usuário
+                    </button>
                 </div>
-                <div class="admin-sections">
-                    <div class="admin-card">
-                        <h3>Categorias de Despesas</h3>
-                        <div id="categoriesManagement"></div>
-                    </div>
-                    <div class="admin-card">
-                        <h3>Tipos de Pagamento</h3>
-                        <div id="paymentTypesManagement"></div>
-                    </div>
-                </div>
+                <div id="usersList" class="users-list-container"></div>
             </div>
         </div>
     </div>
 
     <!-- Modals -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="userModalTitle">Novo Usuário</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="userForm">
+                <input type="hidden" id="userId">
+                <div class="form-group">
+                    <label>Nome Completo</label>
+                    <input type="text" id="userName" required>
+                </div>
+                <div class="form-group">
+                    <label>Usuário (Login)</label>
+                    <input type="text" id="userUsername" required>
+                </div>
+                <div class="form-group" id="passwordGroup">
+                    <label>Senha</label>
+                    <input type="password" id="userPassword">
+                    <small class="hint">Deixe em branco para manter a senha atual ao editar</small>
+                </div>
+                <div class="form-group">
+                    <label>Perfil</label>
+                    <select id="userRole" required>
+                        <option value="user">Usuário Comum</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="resetPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Resetar Senha</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="resetPasswordForm">
+                <input type="hidden" id="resetUserId">
+                <div class="form-group">
+                    <p>Nova senha para <strong id="resetUserName"></strong>:</p>
+                    <input type="password" id="newPassword" required placeholder="Nova senha">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('resetPasswordModal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="tripModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -251,6 +310,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=2.1"></script>
+    <script src="app.js?v=2.2"></script>
 </body>
 </html>
