@@ -65,14 +65,22 @@ class TravelApp {
         try {
             const response = await fetch(url, config);
 
-            if (response.status === 401) {
+            if (response.status === 401 || response.status === 403) {
+                // Token inválido ou expirado
                 this.handleLogout();
                 return null;
             }
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Erro na requisição');
+                let errorMessage = 'Erro na requisição';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error || errorMessage;
+                } catch (e) {
+                    // Se não for JSON, usa o status text
+                    errorMessage = response.statusText;
+                }
+                throw new Error(errorMessage);
             }
 
             return await response.json();
@@ -310,14 +318,26 @@ class TravelApp {
             document.getElementById('companions').value = trip.companions || '';
             document.getElementById('distance').value = trip.distance || '';
             document.getElementById('fuelConsumption').value = trip.fuel_consumption || '';
-            document.getElementById('startDate').value = trip.start_date;
-            document.getElementById('endDate').value = trip.end_date;
+            // Garantir formato YYYY-MM-DD para os inputs de data
+            document.getElementById('startDate').value = trip.start_date ? trip.start_date.split('T')[0] : '';
+            document.getElementById('endDate').value = trip.end_date ? trip.end_date.split('T')[0] : '';
             document.getElementById('initialCash').value = trip.initial_cash;
             form.dataset.editId = trip.id;
         } else {
             // Criação
             document.querySelector('#tripModal .modal-header h3').textContent = 'Nova Viagem';
             form.reset();
+            
+            // Definir datas iniciais seguras (hoje)
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+            
+            document.getElementById('startDate').value = todayStr;
+            document.getElementById('endDate').value = todayStr;
+            
             delete form.dataset.editId;
         }
 
@@ -497,13 +517,21 @@ class TravelApp {
             document.getElementById('expenseAmount').value = expense.amount;
             document.getElementById('expensePaymentType').value = expense.payment_type_id;
             document.getElementById('expenseDescription').value = expense.description;
-            document.getElementById('expenseDate').value = expense.date;
+            // Garantir formato YYYY-MM-DD
+            document.getElementById('expenseDate').value = expense.date ? expense.date.split('T')[0] : '';
             form.dataset.editId = expense.id;
         } else {
             // Criação
             document.querySelector('#expenseModal .modal-header h3').textContent = 'Nova Despesa';
             form.reset();
-            document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+            
+            // Definir data de hoje no fuso horário local
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            document.getElementById('expenseDate').value = `${year}-${month}-${day}`;
+            
             delete form.dataset.editId;
         }
 
@@ -661,9 +689,14 @@ class TravelApp {
         const container = document.getElementById('categoriesManagement');
 
         container.innerHTML = `
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-primary" onclick="app.addCategory()">
+                    <i class="fas fa-plus"></i> Nova Categoria
+                </button>
+            </div>
             <div class="categories-list">
                 ${categories.map(category => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 10px; background: white;">
                         <span style="font-size: 1.1rem;"><i class="${category.icon}"></i> ${category.name}</span>
                         <div>
                             <button class="btn btn-secondary" onclick="app.editCategory(${category.id})" style="padding: 8px 15px;">
@@ -683,9 +716,14 @@ class TravelApp {
         const container = document.getElementById('paymentTypesManagement');
 
         container.innerHTML = `
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-primary" onclick="app.addPaymentType()">
+                    <i class="fas fa-plus"></i> Novo Tipo
+                </button>
+            </div>
             <div class="payment-types-list">
                 ${paymentTypes.map(type => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 10px; background: white;">
                         <span style="font-size: 1.1rem;"><i class="${type.icon}"></i> ${type.name}</span>
                         <div>
                             <button class="btn btn-secondary" onclick="app.editPaymentType(${type.id})" style="padding: 8px 15px;">
@@ -696,6 +734,41 @@ class TravelApp {
                 `).join('')}
             </div>
         `;
+    }
+
+    async addCategory() {
+        const name = prompt('Nome da nova categoria:');
+        if (!name) return;
+        
+        const icon = prompt('Classe do ícone (ex: fas fa-tag):', 'fas fa-tag');
+        if (!icon) return;
+
+        const result = await this.apiCall('/categories', {
+            method: 'POST',
+            body: JSON.stringify({ name, icon })
+        });
+
+        if (result) {
+            this.loadCategoriesManagement();
+            this.populateFilters();
+        }
+    }
+
+    async addPaymentType() {
+        const name = prompt('Nome do novo tipo de pagamento:');
+        if (!name) return;
+        
+        const icon = prompt('Classe do ícone (ex: fas fa-money-bill):', 'fas fa-money-bill');
+        if (!icon) return;
+
+        const result = await this.apiCall('/payment-types', {
+            method: 'POST',
+            body: JSON.stringify({ name, icon })
+        });
+
+        if (result) {
+            this.loadPaymentTypesManagement();
+        }
     }
 
     async editCategory(categoryId) {
@@ -1009,6 +1082,20 @@ class TravelApp {
 
     // Utilitários
     formatDate(dateString) {
+        if (!dateString) return '';
+        
+        // Handle YYYY-MM-DD string directly to avoid timezone issues
+        let datePart = dateString;
+        if (typeof dateString === 'string') {
+             if (dateString.includes('T')) {
+                 datePart = dateString.split('T')[0];
+             }
+             if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                 const [year, month, day] = datePart.split('-');
+                 return `${day}/${month}/${year}`;
+             }
+        }
+
         const date = new Date(dateString);
         return date.toLocaleDateString('pt-BR');
     }
