@@ -1,4 +1,5 @@
 // Aplicação principal com integração ao backend
+console.log('TRAVEL APP VERSION 2.0 - FIX DATAS');
 class TravelApp {
     constructor() {
         this.currentUser = null;
