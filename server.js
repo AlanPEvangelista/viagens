@@ -9,6 +9,10 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 8282;
+
+console.log('--- INICIANDO SERVIDOR VERSÃO 2.0 ---');
+console.log('Data: ' + new Date().toISOString());
+
 const JWT_SECRET = process.env.JWT_SECRET || 'travel_secret_key_2024';
 
 // Middleware
