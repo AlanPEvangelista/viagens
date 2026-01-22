@@ -58,6 +58,15 @@ const upload = multer({
 const dbPath = path.join(__dirname, 'database', 'travel.db');
 const dbDir = path.dirname(dbPath);
 
+// Rota de Diagnóstico de Versão
+app.get('/api/version', (req, res) => {
+    res.json({ 
+        version: '2.0', 
+        timestamp: new Date().toISOString(),
+        message: 'Versão com correção de datas e cache busting' 
+    });
+});
+
 if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
 }
