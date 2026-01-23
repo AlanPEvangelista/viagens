@@ -59,6 +59,12 @@
                         <h2>Minhas Viagens</h2>
                         <div class="header-filters">
                             <input type="text" id="tripLocationFilter" placeholder="Filtrar por local..." class="filter-input">
+                            <select id="tripStatusFilter" class="filter-input">
+                                <option value="">Todos os status</option>
+                                <option value="active">Em Andamento</option>
+                                <option value="planned">Planejada</option>
+                                <option value="completed">Concluída</option>
+                            </select>
                             <input type="date" id="tripDateFilter" class="filter-input">
                         </div>
                     </div>
@@ -307,6 +313,21 @@
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="tripExpensesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Despesas da Viagem</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div id="tripExpensesList" class="expenses-list"></div>
+            </div>
+            <div class="modal-actions" style="padding: 20px; border-top: 1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('tripExpensesModal')">Fechar</button>
+            </div>
         </div>
     </div>
 

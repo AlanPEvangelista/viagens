@@ -48,6 +48,7 @@ class TravelApp {
 
         // Filtros de Viagens (Minhas Viagens)
         document.getElementById('tripLocationFilter').addEventListener('input', () => this.loadTrips());
+        document.getElementById('tripStatusFilter').addEventListener('change', () => this.loadTrips());
         document.getElementById('tripDateFilter').addEventListener('change', () => this.loadTrips());
 
         // Usuários
@@ -385,6 +386,7 @@ class TravelApp {
 
         // Filtros de viagens
         const locationFilter = document.getElementById('tripLocationFilter').value.toLowerCase();
+        const statusFilter = document.getElementById('tripStatusFilter').value;
         const dateFilter = document.getElementById('tripDateFilter').value;
 
         if (locationFilter) {
@@ -392,6 +394,10 @@ class TravelApp {
                 trip.main_destination.toLowerCase().includes(locationFilter) || 
                 (trip.other_destinations && trip.other_destinations.toLowerCase().includes(locationFilter))
             );
+        }
+
+        if (statusFilter) {
+            trips = trips.filter(trip => trip.status === statusFilter);
         }
 
         if (dateFilter) {
@@ -470,8 +476,13 @@ class TravelApp {
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="btn btn-primary" onclick="app.viewTripDetails(${trip.id})">
-                        <i class="fas fa-eye"></i> Ver Detalhes
+                        <i class="fas fa-list"></i> Ver Lançamentos
                     </button>
+                    ${trip.status === 'active' ? `
+                    <button class="btn btn-success" onclick="app.openExpenseModal(null, ${trip.id})">
+                        <i class="fas fa-plus-circle"></i> Lançar Despesa
+                    </button>
+                    ` : ''}
                     ${this.currentUser.role === 'admin' ? `
                     <button class="btn btn-secondary" onclick="app.editTrip(${trip.id})">
                         <i class="fas fa-edit"></i> Editar
@@ -602,9 +613,37 @@ class TravelApp {
     }
 
     async viewTripDetails(tripId) {
-        const summary = await this.apiCall(`/reports/trip/${tripId}`);
-        if (summary) {
-            alert(`Detalhes da Viagem: ${summary.trip.main_destination}\n\nTotal de Despesas: R$ ${summary.totalExpenses.toFixed(2)}\nDinheiro Restante: R$ ${summary.remainingCash.toFixed(2)}\nNúmero de Despesas: ${summary.expensesCount}`);
+        const container = document.getElementById('tripExpensesList');
+        const modal = document.getElementById('tripExpensesModal');
+        
+        container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Carregando despesas...</div>';
+        this.openModal('tripExpensesModal');
+
+        let expenses = await this.apiCall('/expenses');
+        if (!expenses) {
+            container.innerHTML = '<p class="text-center text-danger">Erro ao carregar despesas.</p>';
+            return;
+        }
+
+        // Filtrar despesas desta viagem
+        expenses = expenses.filter(expense => expense.trip_id === tripId);
+
+        if (expenses.length === 0) {
+            container.innerHTML = '<p class="text-center">Nenhuma despesa registrada para esta viagem.</p>';
+            return;
+        }
+
+        // Ordenar por data (mais recente primeiro)
+        expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Reutilizar o card de despesa existente, mas talvez simplificado se necessário
+        container.innerHTML = expenses.map(expense => this.createExpenseCard(expense)).join('');
+        
+        // Atualizar título do modal com informações da viagem (opcional, requer buscar a viagem)
+        const trips = await this.apiCall('/trips');
+        const trip = trips.find(t => t.id === tripId);
+        if (trip) {
+            document.querySelector('#tripExpensesModal .modal-header h3').textContent = `Despesas: ${trip.main_destination}`;
         }
     }
 
@@ -693,12 +732,16 @@ class TravelApp {
         `;
     }
 
-    async openExpenseModal(expense = null) {
+    async openExpenseModal(expense = null, preSelectedTripId = null) {
         const modal = document.getElementById('expenseModal');
         const form = document.getElementById('expenseForm');
+        const tripSelect = document.getElementById('expenseTripId');
 
         // Popular selects
         await this.populateExpenseSelects();
+        
+        // Resetar estado do select
+        tripSelect.disabled = false;
 
         if (expense) {
             // Edição
@@ -724,6 +767,12 @@ class TravelApp {
             document.getElementById('expenseDate').value = `${year}-${month}-${day}`;
             
             delete form.dataset.editId;
+            
+            // Se houver viagem pré-selecionada (via botão "Lançar Despesa" no card da viagem)
+            if (preSelectedTripId) {
+                tripSelect.value = preSelectedTripId;
+                tripSelect.disabled = true;
+            }
         }
 
         this.openModal('expenseModal');
