@@ -251,11 +251,20 @@ app.put('/api/trips/:id', authenticateToken, requireAdmin, (req, res) => {
 app.delete('/api/trips/:id', authenticateToken, requireAdmin, (req, res) => {
     const { id } = req.params;
 
-    db.run(`DELETE FROM trips WHERE id = ?`, [id], function(err) {
-        if (err) {
-            return res.status(500).json({ error: err.message });
+    // Verificar se há despesas cadastradas
+    db.get('SELECT COUNT(*) as count FROM expenses WHERE trip_id = ?', [id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        if (row.count > 0) {
+            return res.status(400).json({ error: 'Não é possível excluir viagem com despesas cadastradas' });
         }
-        res.json({ message: 'Viagem excluída com sucesso' });
+
+        db.run(`DELETE FROM trips WHERE id = ?`, [id], function(err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ message: 'Viagem excluída com sucesso' });
+        });
     });
 });
 

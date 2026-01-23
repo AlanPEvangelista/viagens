@@ -491,9 +491,15 @@ class TravelApp {
                         <i class="fas fa-${trip.status === 'active' ? 'stop' : 'play'}"></i> 
                         ${trip.status === 'active' ? 'Finalizar' : 'Iniciar'}
                     </button>
+                    ${(summary && summary.expensesCount > 0) ? `
+                    <button class="btn btn-danger" disabled title="Viagem com despesas não pode ser excluída" style="opacity: 0.5; cursor: not-allowed;">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+                    ` : `
                     <button class="btn btn-danger" onclick="app.deleteTrip(${trip.id})">
                         <i class="fas fa-trash"></i> Excluir
                     </button>
+                    `}
                     ` : ''}
                 </div>
             </div>
